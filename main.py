@@ -7,10 +7,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import yt_dlp
 
 # --- Config ---
-# Environment Variable "BOT_TOKEN" မှ ယူမည်၊ မရှိပါက နောက်မှ Token ကို သုံးမည်
 TOKEN = os.environ.get("BOT_TOKEN", "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")
 PORT = int(os.environ.get("PORT", 5000))
-SERVER_URL = os.environ.get("SERVER_URL", "")  # ဥပမာ - "https://mybot.onrender.com"
+SERVER_URL = os.environ.get("SERVER_URL", "")
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -84,9 +83,16 @@ async def process_download(query, context, url, format_type, quality):
     chat_id = query.message.chat_id
     caption_text = "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
     
+    # Cookie မလိုဘဲ Bot Detection ကျော်ရန် extractor_args ပြင်ဆင်ထားပါသည်
     ydl_opts = {
         'outtmpl': f'{DOWNLOAD_DIR}/%(id)s.%(ext)s',
         'quiet': True,
+        'nocheckcertificate': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'mweb']
+            }
+        }
     }
     
     if format_type == 'audio':
@@ -102,6 +108,65 @@ async def process_download(query, context, url, format_type, quality):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            file_path = ydl.prepare_filename(info)
+            if format_type == 'audio':
+                file_path = os.path.splitext(file_path)[0] + ".mp3"
+
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+        sent_msg = None
+        if file_size_mb > 50:
+            filename = os.path.basename(file_path)
+            base_url = SERVER_URL.rstrip('/')
+            direct_link = f"{base_url}/files/{filename}" if base_url else f"/files/{filename}"
+            sent_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"ဖိုင်ဆိုဒ် 50MB ထက်ကြီးသောကြောင့် အောက်ပါ Direct Link တွင် ဒေါင်းလုဒ်ဆွဲပါ:\n\n{direct_link}\n\n{caption_text}"
+            )
+        else:
+            with open(file_path, 'rb') as file:
+                if format_type == 'audio':
+                    sent_msg = await context.bot.send_audio(chat_id=chat_id, audio=file, caption=caption_text)
+                else:
+                    sent_msg = await context.bot.send_video(chat_id=chat_id, video=file, caption=caption_text)
+
+        msg_id = sent_msg.message_id if sent_msg else None
+        context.job_queue.run_once(
+            auto_delete, 
+            3600, 
+            data={'file_path': file_path, 'chat_id': chat_id, 'message_id': msg_id}
+        )
+
+    except Exception as e:
+        await context.bot.send_message(chat_id=chat_id, text=f"Error: {str(e)}")
+
+async def auto_delete(context: ContextTypes.DEFAULT_TYPE):
+    job = context.job
+    file_path = job.data['file_path']
+    chat_id = job.data['chat_id']
+    message_id = job.data['message_id']
+
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    if message_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+        except Exception:
+            pass
+
+def main():
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    application = Application.builder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_click))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
             file_path = ydl.prepare_filename(info)
             if format_type == 'audio':
                 file_path = os.path.splitext(file_path)[0] + ".mp3"
