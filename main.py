@@ -7,9 +7,10 @@ from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQu
 import yt_dlp
 
 # --- Config ---
-TOKEN = os.environ.get("8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")  # Server Environment Variable မှ ယူမည်
+# Environment Variable "BOT_TOKEN" မှ ယူမည်၊ မရှိပါက နောက်မှ Token ကို သုံးမည်
+TOKEN = os.environ.get("BOT_TOKEN", "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")
 PORT = int(os.environ.get("PORT", 5000))
-SERVER_URL = os.environ.get("SERVER_URL", "")  # Server ၏ Domain Name
+SERVER_URL = os.environ.get("SERVER_URL", "")  # ဥပမာ - "https://mybot.onrender.com"
 
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -48,9 +49,15 @@ async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(text=msg)
         
     elif query.data.startswith('dl_'):
-        _, format_type, quality, _ = query.data.split('_')
+        parts = query.data.split('_')
+        format_type = parts[1]
+        quality = parts[2]
         url = context.user_data.get('url')
         
+        if not url:
+            await query.edit_message_text("Link မရှိပါ။ ကျေးဇူးပြု၍ Link ပြန်ပို့ပေးပါ။")
+            return
+
         await query.edit_message_text("Downloading... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။")
         asyncio.create_task(process_download(query, context, url, format_type, quality))
 
@@ -62,7 +69,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data['url'] = url
     
-    # 360p ပါဝင်အောင် ပြင်ဆင်ထားသော Keyboard
     keyboard = [
         [InlineKeyboardButton("Video (1080p)", callback_data='dl_video_1080_0'),
          InlineKeyboardButton("Video (720p)", callback_data='dl_video_720_0')],
@@ -102,24 +108,22 @@ async def process_download(query, context, url, format_type, quality):
 
         file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
 
-        # 50MB အထက်ဖြစ်ပါက Direct Link ပို့ပေးခြင်း
+        sent_msg = None
         if file_size_mb > 50:
             filename = os.path.basename(file_path)
-            direct_link = f"{SERVER_URL}/files/{filename}"
-            await context.bot.send_message(
+            base_url = SERVER_URL.rstrip('/')
+            direct_link = f"{base_url}/files/{filename}" if base_url else f"/files/{filename}"
+            sent_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"ဖိုင်ဆိုဒ် 50MB ထက်ကြီးသောကြောင့် အောက်ပါ Direct Link တွင် ဒေါင်းလုဒ်ဆွဲပါ:\n\n{direct_link}\n\n{caption_text}"
             )
-            sent_msg = None
         else:
-            # 50MB အောက်ကို Telegram ထဲ တိုက်ရိုက်ပို့ခြင်း
             with open(file_path, 'rb') as file:
                 if format_type == 'audio':
                     sent_msg = await context.bot.send_audio(chat_id=chat_id, audio=file, caption=caption_text)
                 else:
                     sent_msg = await context.bot.send_video(chat_id=chat_id, video=file, caption=caption_text)
 
-        # 1 နာရီ (၃၆၀၀ စက္ကန့်) ကြာလျှင် ဖိုင်နှင့် မက်ဆေ့ခ်ျကို Auto Clear လုပ်ပေးခြင်း
         msg_id = sent_msg.message_id if sent_msg else None
         context.job_queue.run_once(
             auto_delete, 
@@ -136,11 +140,9 @@ async def auto_delete(context: ContextTypes.DEFAULT_TYPE):
     chat_id = job.data['chat_id']
     message_id = job.data['message_id']
 
-    # Server ထဲမှ ဖိုင်ကို ဖျက်ခြင်း
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    # Telegram မက်ဆေ့ခ်ျကို ဖျက်ခြင်း
     if message_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
