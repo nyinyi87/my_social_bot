@@ -1,166 +1,156 @@
 import os
+import glob
 import asyncio
 import threading
-from flask import Flask, send_from_directory
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+)
 import yt_dlp
 
-# --- Config ---
-TOKEN = os.environ.get("BOT_TOKEN", "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")
-PORT = int(os.environ.get("PORT", 5000))
-SERVER_URL = os.environ.get("SERVER_URL", "")
-
-DOWNLOAD_DIR = "downloads"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
+# Flask app for Back4App health check
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running live!"
-
-@app.route('/files/<path:filename>')
-def download_file(filename):
-    return send_from_directory(DOWNLOAD_DIR, filename, as_attachment=True)
+    return "Bot is running!"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=PORT)
+    app.run(host='0.0.0.0', port=8080)
 
-# --- Telegram Bot Logic ---
+# Bot Token ကို BotFather မှရယူ၍ ဒီနေရာတွင် ထည့်ပါ
+TOKEN = '8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE'
+
+# ၁။ English / Myanmar ဘာသာစကား ရွေးချယ်ခိုင်းခြင်း
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
-        [InlineKeyboardButton("English 🇬🇧", callback_data='lang_en'),
-         InlineKeyboardButton("မြန်မာ 🇲🇲", callback_data='lang_mm')]
+        [
+            InlineKeyboardButton("English 🇬🇧", callback_data='lang_en'),
+            InlineKeyboardButton("မြန်မာစာ 🇲🇲", callback_data='lang_my'),
+        ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Please select your language / ကျေးဇူးပြု၍ ဘာသာစကား ရွေးချယ်ပါ:", reply_markup=reply_markup)
+    await update.message.reply_text("Please select your language / ကျေးဇူးပြု၍ ဘာသာစကားရွေးချယ်ပါ:", reply_markup=reply_markup)
 
-async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ၂။ ဘာသာစကားရွေးချယ်ပြီးနောက် နှုတ်ဆက်စာ ပို့ခြင်း
+async def language_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data.startswith('lang_'):
-        lang = query.data.split('_')[1]
-        context.user_data['lang'] = lang
-        msg = "Language set to English. Send me a video/photo link!" if lang == 'en' else "ဘာသာစကား မြန်မာ ကိုရွေးချယ်ပြီးပါပြီ။ Video/Photo Link ပို့ပေးပါ။"
-        await query.edit_message_text(text=msg)
-        
-    elif query.data.startswith('dl_'):
-        parts = query.data.split('_')
-        format_type = parts[1]
-        quality = parts[2]
-        url = context.user_data.get('url')
-        
-        if not url:
-            await query.edit_message_text("Link မရှိပါ။ ကျေးဇူးပြု၍ Link ပြန်ပို့ပေးပါ။")
-            return
+    first_name = query.from_user.first_name
+    lang = query.data
 
-        await query.edit_message_text("Downloading... ကျေးဇူးပြု၍ ခဏစောင့်ပါ။")
-        asyncio.create_task(process_download(query, context, url, format_type, quality))
+    if lang == 'lang_en':
+        text = f"Hello {first_name}!\nPlease send me YouTube, Facebook, or Instagram video/photo links."
+    else:
+        text = f"မင်္ဂလာပါ {first_name}!\nYouTube, Facebook, Instagram video/photo link များကို ပို့ပေးပါ။"
 
+    await query.edit_message_text(text=text)
+
+# ဒေါင်းလုဒ်ဆွဲထားသော File ကို ၁ နာရီအကြာတွင် Auto Clear (ဖျက်) လုပ်ပေးသည့် function
+def delete_file_later(file_path):
+    async def task():
+        await asyncio.sleep(3600)  # ၁ နာရီ (၃၆၀၀ စက္ကန့်)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    asyncio.create_task(task())
+
+# Telegram မှ ပို့လိုက်သော File / Message ကို Telegram Server တွင် ၁ နာရီအကြာ Auto Clear လုပ်ခြင်း
+async def delete_msg_later(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int):
+    await asyncio.sleep(3600)
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        pass
+
+# ၃၊ ၄၊ ၅၊ ၆၊ ၇။ Link များကို လက်ခံပြီး Download ယူခြင်း
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
+    chat_id = update.effective_chat.id
+
     if not (url.startswith("http://") or url.startswith("https://")):
-        await update.message.reply_text("Invalid Link! / မှားယွင်းသော Link ဖြစ်ပါသည်။")
+        await update.message.reply_text("ကျေးဇူးပြု၍ မှန်ကန်သော Link ကို ပို့ပေးပါ။ / Please send a valid link.")
         return
 
-    context.user_data['url'] = url
-    
-    keyboard = [
-        [InlineKeyboardButton("Video (1080p)", callback_data='dl_video_1080_0'),
-         InlineKeyboardButton("Video (720p)", callback_data='dl_video_720_0')],
-        [InlineKeyboardButton("Video (480p)", callback_data='dl_video_480_0'),
-         InlineKeyboardButton("Video (360p)", callback_data='dl_video_360_0')],
-        [InlineKeyboardButton("Video (144p)", callback_data='dl_video_144_0'),
-         InlineKeyboardButton("MP3 Audio", callback_data='dl_audio_best_0')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Choose Format/Quality / အရည်အသွေး ရွေးချယ်ပါ:", reply_markup=reply_markup)
+    status_msg = await update.message.reply_text("Processing... ခဏစောင့်ပေးပါ။")
 
-async def process_download(query, context, url, format_type, quality):
-    chat_id = query.message.chat_id
-    caption_text = "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
-    
+    # yt-dlp အပြင်အဆင် (Quality: 144p - 1080p အထိ ရွေးချယ်ခြင်း)
     ydl_opts = {
-        'outtmpl': f'{DOWNLOAD_DIR}/%(id)s.%(ext)s',
+        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]/best',
+        'outtmpl': f'downloads/{chat_id}_%(title)s.%(ext)s',
         'quiet': True,
-        'nocheckcertificate': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'ios', 'web']
-            }
-        }
+        'no_warnings': True,
     }
-    
-    if format_type == 'audio':
-        ydl_opts['format'] = 'bestaudio/best'
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
-    else:
-        ydl_opts['format'] = f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best'
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            file_path = ydl.prepare_filename(info)
-            if format_type == 'audio':
-                file_path = os.path.splitext(file_path)[0] + ".mp3"
+            filename = ydl.prepare_filename(info)
 
+        # Download ဆွဲထားသော ဖိုင်ကို ရှာဖွေခြင်း
+        downloaded_files = glob.glob(f'downloads/{chat_id}_*')
+        if not downloaded_files:
+            await status_msg.edit_text("Download ရယူရာတွင် အဆင်မပြေပါ။")
+            return
+
+        file_path = downloaded_files[0]
         file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
 
-        sent_msg = None
-        if file_size_mb > 50:
-            filename = os.path.basename(file_path)
-            base_url = SERVER_URL.rstrip('/')
-            direct_link = f"{base_url}/files/{filename}" if base_url else f"/files/{filename}"
-            sent_msg = await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"ဖိုင်ဆိုဒ် 50MB ထက်ကြီးသောကြောင့် အောက်ပါ Direct Link တွင် ဒေါင်းလုဒ်ဆွဲပါ:\n\n{direct_link}\n\n{caption_text}"
-            )
-        else:
-            with open(file_path, 'rb') as file:
-                if format_type == 'audio':
-                    sent_msg = await context.bot.send_audio(chat_id=chat_id, audio=file, caption=caption_text)
-                else:
-                    sent_msg = await context.bot.send_video(chat_id=chat_id, video=file, caption=caption_text)
+        # ၇။ Caption စာသား
+        caption_text = "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
 
-        msg_id = sent_msg.message_id if sent_msg else None
-        context.job_queue.run_once(
-            auto_delete, 
-            3600, 
-            data={'file_path': file_path, 'chat_id': chat_id, 'message_id': msg_id}
-        )
+        # ၅။ 50MB ထက်ကြီးပါက Direct Link ပို့ပေးခြင်း
+        if file_size_mb > 50:
+            # Direct link ကို ပို့ပေးခြင်း (Chrome မှတဆင့် ဒေါင်းရန်)
+            direct_link = info.get('url', url)
+            sent_msg = await update.message.reply_text(
+                f"ဖိုင်ဆိုဒ် 50MB ထက်ကြီးနေပါသဖြင့် Direct Link မှတဆင့် ဒေါင်းလုဒ်ရယူပါ:\n\n[Click to Download]({direct_link})\n\n{caption_text}",
+                parse_mode='Markdown'
+            )
+            # local ဖိုင်ကို ရှင်းထုတ်ခြင်း
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        else:
+            # ၄။ Video သို့မဟုတ် Photo/Mp3 ကို Telegram ထဲ တိုက်ရိုက်ပြန်ပို့ပေးခြင်း
+            await status_msg.edit_text("Telegram သို့ ဖိုင်တင်ပို့နေပါသည်။...")
+            with open(file_path, 'rb') as f:
+                if file_path.endswith(('.jpg', '.png', '.jpeg')):
+                    sent_msg = await context.bot.send_photo(chat_id=chat_id, photo=f, caption=caption_text)
+                else:
+                    sent_msg = await context.bot.send_video(chat_id=chat_id, video=f, caption=caption_text)
+
+            # Local မှ ဖိုင်ကို ၁ နာရီအကြာတွင် ဖျက်ရန်
+            delete_file_later(file_path)
+
+        await status_msg.delete()
+
+        # ၆။ Telegram တွင် ပို့လိုက်သော message/video ကို ၁ နာရီအကြာတွင် Auto clear (ဖျက်) ပေးခြင်း
+        asyncio.create_task(delete_msg_later(context, chat_id, sent_msg.message_id))
 
     except Exception as e:
-        await context.bot.send_message(chat_id=chat_id, text=f"Error: {str(e)}")
-
-async def auto_delete(context: ContextTypes.DEFAULT_TYPE):
-    job = context.job
-    file_path = job.data['file_path']
-    chat_id = job.data['chat_id']
-    message_id = job.data['message_id']
-
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
-    if message_id:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-        except Exception:
-            pass
+        await status_msg.edit_text(f"ဒေါင်းလုဒ်ပြုလုပ်စဉ် အမှားအယွင်းရှိပါသည်: {str(e)}")
 
 def main():
+    # Folder မရှိပါက အသစ်ဆောက်ရန်
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
+
+    # Flask ကို Thread ဖြင့် သီးသန့် Run ခြင်း
     threading.Thread(target=run_flask, daemon=True).start()
 
+    # Telegram Bot စတင်ခြင်း
     application = Application.builder().token(TOKEN).build()
+
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_click))
+    application.add_handler(CallbackQueryHandler(language_button))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
+
     application.run_polling()
 
 if __name__ == '__main__':
