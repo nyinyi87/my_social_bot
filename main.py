@@ -15,7 +15,7 @@ from telegram.ext import (
 import yt_dlp
 
 app = Flask(__name__)
-SERVER_URL = os.getenv("SERVER_URL", "https://your-app-name.b4a.run")
+SERVER_URL = os.getenv("SERVER_URL", "https://mytelegrambot-fx4m1m4f.b4a.run/")
 
 @app.route('/')
 def home():
@@ -32,7 +32,7 @@ def download_file(filename):
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
-TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
+TOKEN = os.getenv("BOT_TOKEN", "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")
 
 # နောက်ကွယ်မှ ဖိုင်ဖျက်မည့် Async Task
 async def delete_file_later(file_path: str, delay: int = 3600):
