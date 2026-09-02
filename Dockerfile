@@ -1,19 +1,21 @@
 FROM python:3.10-slim
 
-# Pre-built Static FFmpeg နှင့် Probe ကို ကူးယူခြင်း (စက္ကန့်ပိုင်းပဲ ကြာပါမည်)
-COPY --from=mwader/static-ffmpeg:6.0 /ffmpeg /usr/local/bin/
-COPY --from=mwader/static-ffmpeg:6.0 /ffprobe /usr/local/bin/
-
-# git သာ လိုအပ်ပါက အောက်ပါအတိုင်း ပေါ့ပါးစွာ ထည့်ပါ
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+# FFmpeg နှင့် လိုအပ်သော System Package များ တင်ယူခြင်း
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# Requirements များကို Install လုပ်ခြင်း
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Project File များအားလုံးကို Copy ကူးခြင်း
 COPY . .
+
+# downloads folder မရှိပါက ဆောက်ပေးခြင်း
+RUN mkdir -p downloads
 
 EXPOSE 8080
 
