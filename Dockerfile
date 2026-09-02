@@ -1,7 +1,12 @@
 FROM python:3.10-slim
 
-# ffmpeg ထည့်သွင်းခြင်း (Video နှင့် Audio များ ပေါင်းစပ်ရန်)
-RUN apt-get update && apt-get install -y ffmpeg git && rm -rf /var/lib/apt/lists/*
+# Pre-built Static FFmpeg နှင့် Probe ကို ကူးယူခြင်း (စက္ကန့်ပိုင်းပဲ ကြာပါမည်)
+COPY --from=mwader/static-ffmpeg:6.0 /ffmpeg /usr/local/bin/
+COPY --from=mwader/static-ffmpeg:6.0 /ffprobe /usr/local/bin/
+
+# git သာ လိုအပ်ပါက အောက်ပါအတိုင်း ပေါ့ပါးစွာ ထည့်ပါ
+RUN apt-get update && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
