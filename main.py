@@ -15,13 +15,13 @@ from telegram.ext import (
 import yt_dlp
 
 app = Flask(__name__)
-SERVER_URL = os.getenv("SERVER_URL", "https://mytelegrambot-fx4m1m4f.b4a.run/")
+SERVER_URL = os.getenv("SERVER_URL", "https://your-app-name.b4a.run")
 
 @app.route('/')
 def home():
     return "Bot is running perfectly!"
 
-@app.route('/download/<filename>')
+@app.route('/download/<path:filename>')
 def download_file(filename):
     file_path = os.path.join('downloads', filename)
     if os.path.exists(file_path):
@@ -32,19 +32,19 @@ def download_file(filename):
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
 
-TOKEN = os.getenv("BOT_TOKEN", "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE")
+TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
 
-def delete_file_later(file_path, delay=3600):
-    async def task():
-        await asyncio.sleep(delay)
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception:
-                pass
-    asyncio.create_task(task())
+# နောက်ကွယ်မှ ဖိုင်ဖျက်မည့် Async Task
+async def delete_file_later(file_path: str, delay: int = 3600):
+    await asyncio.sleep(delay)
+    if os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+        except Exception:
+            pass
 
-async def delete_msg_later(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, delay=3600):
+# စာတိုဖျက်မည့် Async Task
+async def delete_msg_later(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id: int, delay: int = 3600):
     await asyncio.sleep(delay)
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
@@ -102,6 +102,136 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ],
         [
             InlineKeyboardButton("🎵 MP3 Audio Only", callback_data='quality_mp3'),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "ကျေးဇူးပြု၍ ဒေါင်းလုဒ်ဆွဲလိုသော Quality သို့မဟုတ် Format ကို ရွေးချယ်ပါ:",
+        reply_markup=reply_markup
+    )
+
+# Sync yt-dlp function ကို thread ဖြင့် သီးသန့် run ရန် ပြင်ဆင်ခြင်း
+def download_with_ytdlp(ydl_opts, url):
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        return ydl.extract_info(url, download=True)
+
+async def process_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    choice = query.data
+    url = context.user_data.get('download_url')
+    chat_id = update.effective_chat.id
+
+    if not url:
+        await query.edit_message_text("Link သက်တမ်းကုန်သွားပါပြီ။ Link ကို ပြန်လည်ပို့ပေးပါ။")
+        return
+
+    await query.edit_message_text("🔄 ဒေါင်းလုဒ်ဆွဲနေပါသည်။ ခဏစောင့်ပေးပါ...")
+
+    out_prefix = f"{chat_id}_{query.id}"
+    outtmpl = f"downloads/{out_prefix}_%(title)s.%(ext)s"
+
+    common_opts = {
+        'outtmpl': outtmpl,
+        'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+        'quiet': True,
+        'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'web']
+            }
+        }
+    }
+
+    if choice == 'quality_mp3':
+        ydl_opts = {
+            **common_opts,
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+    else:
+        res = choice.split('_')[1]
+        ydl_opts = {
+            **common_opts,
+            'format': f'bestvideo[height<={res}]+bestaudio/best[height<={res}]/best',
+        }
+
+    try:
+        # Blocking function ကို thread ဖြင့် run စေခြင်း
+        await asyncio.to_thread(download_with_ytdlp, ydl_opts, url)
+
+        matched_files = glob.glob(f"downloads/{out_prefix}_*")
+        if not matched_files:
+            await query.edit_message_text("❌ ဒေါင်းလုဒ်ရယူရာတွင် အဆင်မပြေပါ။")
+            return
+
+        file_path = matched_files[0]
+        filename = os.path.basename(file_path)
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+
+        caption_text = "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
+
+        if file_size_mb > 50:
+            direct_download_url = f"{SERVER_URL}/download/{filename}"
+            
+            message_text = (
+                f"⚠️ **ဖိုင်ဆိုဒ် ({file_size_mb:.1f} MB) ရှိသဖြင့် Telegram Limit ထက်ကျော်လွန်နေပါသည်။**\n\n"
+                f"📥 အောက်ပါ Button ကိုနှိပ်ပါက Direct Auto Download ရယူပါလိမ့်မည်:\n\n"
+                f"{caption_text}"
+            )
+            
+            keyboard = [[InlineKeyboardButton("⬇️ Direct Download", url=direct_download_url)]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            sent_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=message_text,
+                reply_markup=reply_markup,
+                parse_mode='Markdown'
+            )
+            
+            asyncio.create_task(delete_file_later(file_path, delay=3600))
+        else:
+            await query.edit_message_text("📤 Telegram သို့ တင်ပို့နေပါသည်။...")
+            
+            with open(file_path, 'rb') as f:
+                if choice == 'quality_mp3' or file_path.endswith('.mp3'):
+                    sent_msg = await context.bot.send_audio(chat_id=chat_id, audio=f, caption=caption_text)
+                elif file_path.endswith(('.jpg', '.jpeg', '.png', '.webp')):
+                    sent_msg = await context.bot.send_photo(chat_id=chat_id, photo=f, caption=caption_text)
+                else:
+                    sent_msg = await context.bot.send_video(chat_id=chat_id, video=f, caption=caption_text)
+
+            asyncio.create_task(delete_file_later(file_path, delay=10))
+
+        asyncio.create_task(delete_msg_later(context, chat_id, sent_msg.message_id, delay=3600))
+        await query.message.delete()
+
+    except Exception as e:
+        await query.edit_message_text(f"❌ အမှားအယွင်း ဖြစ်ပေါ်ခဲ့သည်: {str(e)}")
+
+def main():
+    if not os.path.exists('downloads'):
+        os.makedirs('downloads')
+
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    application = Application.builder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(language_button, pattern='^lang_'))
+    application.add_handler(CallbackQueryHandler(process_download, pattern='^quality_'))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    application.run_polling()
+
+if __name__ == '__main__':
+    main()
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
