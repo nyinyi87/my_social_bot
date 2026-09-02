@@ -127,4 +127,66 @@ async function sendMediaFile(chatId, filePath) {
     );
   }
 }
+// Link များ (YouTube, Facebook, Instagram) လက်ခံပြီး Download ဆွဲပေးမည့် Logic
+bot.on("message", async (msg) => {
+  const chatId = msg.chat.id;
+  const textMsg = msg.text;
+
+  // Command များကို ကျော်ရန်
+  if (!textMsg || textMsg.startsWith("/")) return;
+
+  // URL ဟုတ်မဟုတ် စစ်ဆေးခြင်း
+  if (textMsg.includes("youtube.com") || textMsg.includes("youtu.be")) {
+    const progress = await bot.sendMessage(
+      chatId,
+      text(chatId, "⏳ YouTube Video ဒေါင်းလုဒ်ဆွဲနေပါတယ်...", "⏳ Downloading YouTube Video...")
+    );
+
+    try {
+      const filePath = await downloadVideo(textMsg);
+      await sendMediaFile(chatId, filePath);
+      await bot.deleteMessage(chatId, progress.message_id);
+    } catch (error) {
+      console.error(error);
+      await bot.sendMessage(
+        chatId,
+        text(chatId, "❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ရှိနေပါသည်။", "❌ Download failed.")
+      );
+    }
+  } else if (textMsg.includes("facebook.com") || textMsg.includes("fb.watch")) {
+    const progress = await bot.sendMessage(
+      chatId,
+      text(chatId, "⏳ Facebook Video ဒေါင်းလုဒ်ဆွဲနေပါတယ်...", "⏳ Downloading Facebook Video...")
+    );
+
+    try {
+      const filePath = await downloadFacebook(textMsg);
+      await sendMediaFile(chatId, filePath);
+      await bot.deleteMessage(chatId, progress.message_id);
+    } catch (error) {
+      console.error(error);
+      await bot.sendMessage(
+        chatId,
+        text(chatId, "❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ရှိနေပါသည်။", "❌ Download failed.")
+      );
+    }
+  } else if (textMsg.includes("instagram.com")) {
+    const progress = await bot.sendMessage(
+      chatId,
+      text(chatId, "⏳ Instagram Media ဒေါင်းလုဒ်ဆွဲနေပါတယ်...", "⏳ Downloading Instagram Media...")
+    );
+
+    try {
+      const filePath = await downloadInstagram(textMsg);
+      await sendMediaFile(chatId, filePath);
+      await bot.deleteMessage(chatId, progress.message_id);
+    } catch (error) {
+      console.error(error);
+      await bot.sendMessage(
+        chatId,
+        text(chatId, "❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ရှိနေပါသည်။", "❌ Download failed.")
+      );
+    }
+  }
+});
 
