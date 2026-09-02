@@ -11,7 +11,7 @@ const { downloadVideo, downloadMP3, getThumbnail } = require("./utils/youtube");
 const { downloadFacebook } = require("./utils/facebook");
 const { downloadInstagram } = require("./utils/instagram");
 
-const token = process.env.BOT_TOKEN || "YOUR_TELEGRAM_BOT_TOKEN";
+const token = process.env.BOT_TOKEN || "8874977378:AAG3wcNSI3myiaifFOMNyfBirMZyGrcgSeE";
 const bot = new TelegramBot(token, { polling: true });
 
 const PORT = process.env.PORT || 3000;
