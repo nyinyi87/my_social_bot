@@ -5,6 +5,7 @@ const fs = require("fs");
 const { downloadVideo, downloadMP3 } = require("./utils/youtube");
 const { downloadFacebook } = require("./utils/facebook");
 const { downloadInstagram } = require("./utils/instagram");
+require("./utils/cleanup");
 
 const app = express();
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
