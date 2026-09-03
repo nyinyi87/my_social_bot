@@ -1,16 +1,16 @@
 {
   "name": "telegram-downloader-bot",
   "version": "1.0.0",
-  "description": "Multi-platform Telegram Downloader Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "node-cron": "^3.0.3",
     "node-telegram-bot-api": "^0.66.0",
-    "yt-dlp-wrap": "^2.3.12"
+    "express": "^4.19.2",
+    "axios": "^1.7.2",
+    "yt-dlp-wrap": "^2.3.12",
+    "fs-extra": "^11.2.0",
+    "node-cron": "^3.0.3"
   }
 }
