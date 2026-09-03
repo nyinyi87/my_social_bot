@@ -1,9 +1,10 @@
 const YTDlpWrap = require("yt-dlp-wrap").default;
-const yt = new YTDlpWrap("/usr/bin/yt-dlp");
+
+const yt = new YTDlpWrap("/usr/local/bin/yt-dlp");
 
 async function downloadFacebook(url) {
 
-  const output = `downloads/${Date.now()}.mp4`;
+  const output = `downloads/facebook_${Date.now()}.mp4`;
 
   await yt.execPromise([
     url,
@@ -14,4 +15,6 @@ async function downloadFacebook(url) {
   return output;
 }
 
-module.exports = { downloadFacebook };
+module.exports = {
+  downloadFacebook
+};
