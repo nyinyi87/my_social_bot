@@ -3,11 +3,14 @@ const path = require("path");
 
 const app = express();
 
-// Static file hosting for downloads
+// downloads folder ကို public လုပ်ပေးမယ်
 app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 
 app.get("/", (req, res) => {
-  res.send("Downloader Bot Server is running!");
+  res.send("Downloader Server Running");
 });
 
-module.exports = app;
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
+});
