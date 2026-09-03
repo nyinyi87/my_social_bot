@@ -35,7 +35,45 @@ bot.onText(/\/start/, (msg) => {
 });
 
 // Language
-bot.on("callback_query", (query) => {
+bot.on("let userLink = {};
+
+bot.on("message", (msg) => {
+
+  if (!msg.text) return;
+
+  if (
+    msg.text.includes("youtube.com") ||
+    msg.text.includes("youtu.be")
+  ) {
+
+    userLink[msg.chat.id] = msg.text;
+
+    bot.sendMessage(msg.chat.id,
+      "🎬 Video Quality ရွေးပါ",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "144p", callback_data: "144" },
+              { text: "240p", callback_data: "240" }
+            ],
+            [
+              { text: "360p", callback_data: "360" },
+              { text: "480p", callback_data: "480" }
+            ],
+            [
+              { text: "720p", callback_data: "720" },
+              { text: "1080p", callback_data: "1080" }
+            ],
+            [
+              { text: "🎵 MP3", callback_data: "mp3" }
+            ]
+          ]
+        }
+      });
+  }
+
+});", (query) => {
   const chatId = query.message.chat.id;
   const name = query.from.first_name;
 
