@@ -1,19 +1,14 @@
 const YTDlpWrap = require("yt-dlp-wrap").default;
-const path = require("path");
-const fs = require("fs-extra");
-
-const yt = new YTDlpWrap();
-const DOWNLOAD_DIR = "./downloads";
-
-fs.ensureDirSync(DOWNLOAD_DIR);
+const yt = new YTDlpWrap("/usr/bin/yt-dlp");
 
 async function downloadInstagram(url) {
-  const file = `${Date.now()}_instagram.mp4`;
-  const output = path.join(DOWNLOAD_DIR, file);
+
+  const output = `downloads/${Date.now()}.mp4`;
 
   await yt.execPromise([
     url,
-    "-o", output
+    "-o",
+    output
   ]);
 
   return output;
