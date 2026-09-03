@@ -1,5 +1,15 @@
 {
+  "name": "my_social_bot",
+  "version": "1.0.0",
+  "main": "index.js",
   "scripts": {
-    "start": "npm install -g yt-dlp && node index.js"
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "yt-dlp-wrap": "^2.3.12",
+    "fs-extra": "^11.2.0",
+    "node-cron": "^3.0.3"
   }
 }
