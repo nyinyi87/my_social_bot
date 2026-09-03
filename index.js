@@ -1,3 +1,5 @@
+const { downloadVideo, downloadMP3 } = require("./utils/youtube");
+const fs = require("fs");
 const { downloadFacebook } = require("./utils/facebook");
 const { downloadInstagram } = require("./utils/instagram");
 const TelegramBot = require("node-telegram-bot-api");
