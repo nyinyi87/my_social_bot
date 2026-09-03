@@ -1,8 +1,12 @@
 const YTDlpWrap = require("yt-dlp-wrap").default;
+const fs = require("fs-extra");
+
+fs.ensureDirSync("./downloads");
 
 const yt = new YTDlpWrap("/usr/local/bin/yt-dlp");
 
 async function downloadVideo(url, quality) {
+
   const output = `downloads/${Date.now()}.mp4`;
 
   await yt.execPromise([
@@ -19,6 +23,7 @@ async function downloadVideo(url, quality) {
 }
 
 async function downloadMP3(url) {
+
   const output = `downloads/${Date.now()}.mp3`;
 
   await yt.execPromise([
@@ -33,4 +38,7 @@ async function downloadMP3(url) {
   return output;
 }
 
-module.exports = { downloadVideo, downloadMP3 };
+module.exports = {
+  downloadVideo,
+  downloadMP3
+};
