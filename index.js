@@ -8,130 +8,118 @@ const { downloadInstagram } = require("./utils/instagram");
 require("./utils/cleanup");
 
 const app = express();
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+
+const bot = new TelegramBot(process.env.BOT_TOKEN, {
+  polling: true
+});
+
+// =========================
+// Back4App Server
+// =========================
 
 app.get("/", (req, res) => {
-  res.send("Telegram Downloader Bot Running");
+  res.send("Telegram Downloader Bot Running ✅");
 });
 
 app.listen(process.env.PORT || 3000);
 
-// User Link သိမ်းရန်
-let userLink = {};
+// =========================
+// User Data
+// =========================
 
-// /start
+let userLink = {};
+let language = {};
+
+// =========================
+// START COMMAND
+// =========================
+
 bot.onText(/\/start/, (msg) => {
-  bot.sendMessage(msg.chat.id,
+
+  bot.sendMessage(
+    msg.chat.id,
     "🌐 Choose Language / ဘာသာစကားရွေးပါ",
     {
       reply_markup: {
         inline_keyboard: [[
-          { text: "🇲🇲 မြန်မာ", callback_data: "mm" },
-          { text: "🇺🇸 English", callback_data: "en" }
+          {
+            text: "🇲🇲 မြန်မာ",
+            callback_data: "mm"
+          },
+          {
+            text: "🇺🇸 English",
+            callback_data: "en"
+          }
         ]]
       }
     }
   );
+
 });
 
-// Language
-bot.on("callback_query", async (query) => {
-  const chatId = query.message.chat.id;
-  const name = query.from.first_name;
+// =========================
+// HELP
+// =========================
 
-  // Language
-  if (query.data === "mm") {
-    return bot.sendMessage(chatId,
-      `မင်္ဂလာပါ ${name}
+bot.onText(/\/help/, (msg) => {
 
-YouTube, Facebook နှင့် Instagram Link ပို့ပေးပါ။`);
-  }
+  bot.sendMessage(
+    msg.chat.id,
+    `📚 အသုံးပြုပုံ
 
-  if (query.data === "en") {
-    return bot.sendMessage(chatId,
-      `Hello ${name}
+1. /start နှိပ်ပါ။
+2. Language ရွေးပါ။
+3. Link ပို့ပါ။
+4. Quality ရွေးပါ။
+5. Download ပြုလုပ်ပါ။`
+  );
 
-Send YouTube, Facebook or Instagram Link.`);
-  }
+});
 
-  // Download Quality
-  const quality = query.data;
-  const data = userLink[chatId];
+// =========================
+// ABOUT
+// =========================
 
-  if (!data) return;
+bot.onText(/\/about/, (msg) => {
 
-  bot.sendMessage(chatId, "⏳ Downloading...");
+  bot.sendMessage(
+    msg.chat.id,
+`🤖 Telegram Downloader Bot
 
-  try {
+Supports:
+• YouTube
+• Facebook
+• Instagram
 
-    // Facebook
-    if (data.type === "facebook") {
-      const video = await downloadFacebook(data.url);
-
-      await bot.sendVideo(chatId, video, {
-        caption: "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
-      });
-
-      fs.unlinkSync(video);
-      return;
-    }
-
-    // Instagram
-    if (data.type === "instagram") {
-      const media = await downloadInstagram(data.url);
-
-      await bot.sendVideo(chatId, media, {
-        caption: "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
-      });
-
-      fs.unlinkSync(media);
-      return;
-    }
-
-    // YouTube MP3
-    if (quality === "mp3") {
-      const audio = await downloadMP3(data.url);
-
-      await bot.sendAudio(chatId, audio, {
-        caption: "Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။"
-      });
-
-      fs.unlinkSync(audio);
-      return;
-    }
-
-    // YouTube Video
-    const video = await downloadVideo(data.url, quality);
-
-    await bot.sendVideo(chatId, video, {
-      caption: `🎬 ${quality} Download Complete
+Video / MP3 / Photo Downloader
 
 Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။`
-    });
-
-    fs.unlinkSync(video);
-
-  } catch (err) {
-    console.log(err);
-    bot.sendMessage(chatId, "❌ Download Failed");
-  }
+  );
 
 });
 
-// Link Detect
+// =========================
+// LINK DETECT
+// =========================
+
 bot.on("message", (msg) => {
 
   if (!msg.text) return;
 
   const url = msg.text;
 
-  if (url.includes("youtube.com") || url.includes("youtu.be")) {
+  // YouTube
+  if (
+    url.includes("youtube.com") ||
+    url.includes("youtu.be")
+  ) {
     userLink[msg.chat.id] = {
       type: "youtube",
       url
     };
   }
 
+  // Facebook
   if (url.includes("facebook.com")) {
     userLink[msg.chat.id] = {
       type: "facebook",
@@ -139,6 +127,7 @@ bot.on("message", (msg) => {
     };
   }
 
+  // Instagram
   if (url.includes("instagram.com")) {
     userLink[msg.chat.id] = {
       type: "instagram",
@@ -147,8 +136,10 @@ bot.on("message", (msg) => {
   }
 
   if (userLink[msg.chat.id]) {
-    bot.sendMessage(msg.chat.id,
-      "📥 Quality ရွေးပါ။",
+
+    bot.sendMessage(
+      msg.chat.id,
+      "📥 Quality ရွေးပါ",
       {
         reply_markup: {
           inline_keyboard: [
@@ -171,6 +162,180 @@ bot.on("message", (msg) => {
         }
       }
     );
+
+  }
+
+});
+
+// =========================
+// CALLBACK QUERY
+// =========================
+
+bot.on("callback_query", async (query) => {
+
+  const chatId = query.message.chat.id;
+  const name = query.from.first_name;
+
+  // Myanmar
+  if (query.data === "mm") {
+
+    language[chatId] = "mm";
+
+    return bot.sendMessage(
+      chatId,
+`မင်္ဂလာပါ ${name}
+
+YouTube, Facebook နှင့် Instagram Video Link ပို့ပေးပါ။`
+    );
+
+  }
+
+  // English
+  if (query.data === "en") {
+
+    language[chatId] = "en";
+
+    return bot.sendMessage(
+      chatId,
+`Hello ${name}
+
+Send YouTube, Facebook or Instagram Video Link.`
+    );
+
+  }
+
+  const quality = query.data;
+  const data = userLink[chatId];
+
+  if (!data) return;
+
+  const loading = await bot.sendMessage(
+    chatId,
+    "⏳ Downloading..."
+  );
+
+  try {
+
+    // =========================
+    // FACEBOOK
+    // =========================
+
+    if (data.type === "facebook") {
+
+      const video = await downloadFacebook(data.url);
+
+      await bot.sendVideo(chatId, video, {
+        caption:
+`📥 Facebook Download Complete
+
+Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။`
+      });
+
+      fs.unlinkSync(video);
+
+      return;
+    }
+
+    // =========================
+    // INSTAGRAM
+    // =========================
+
+    if (data.type === "instagram") {
+
+      const media = await downloadInstagram(data.url);
+
+      await bot.sendVideo(chatId, media, {
+        caption:
+`📥 Instagram Download Complete
+
+Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။`
+      });
+
+      fs.unlinkSync(media);
+
+      return;
+    }
+
+    // =========================
+    // YOUTUBE MP3
+    // =========================
+
+    if (quality === "mp3") {
+
+      const audio = await downloadMP3(data.url);
+
+      await bot.sendAudio(chatId, audio, {
+        caption:
+`🎵 MP3 Download Complete
+
+Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။`
+      });
+
+      fs.unlinkSync(audio);
+
+      return;
+    }
+
+    // =========================
+    // YOUTUBE VIDEO
+    // =========================
+
+    const video = await downloadVideo(data.url, quality);
+
+    const size = fs.statSync(video).size;
+
+    // 50MB အောက်
+    if (size <= 50 * 1024 * 1024) {
+
+      await bot.sendVideo(chatId, video, {
+        caption:
+`🎬 ${quality} Download Complete
+
+Bot ကိုအသုံးပြုသည့်အတွက် ကျေးဇူးတင်ပါသည်။`
+      });
+
+    }
+
+    // 50MB အထက်
+    else {
+
+      const fileName = video.split("/").pop();
+
+      const link =
+        `${process.env.BASE_URL}/downloads/${fileName}`;
+
+      await bot.sendMessage(
+        chatId,
+`📦 Video Size 50MB ကျော်နေပါတယ်။
+
+⬇️ Direct Download Link
+
+${link}
+
+Chrome ထဲဖွင့်လိုက်ရင် Auto Download စပါမယ်။`
+      );
+
+    }
+
+    fs.unlinkSync(video);
+
+    bot.editMessageText(
+      "✅ Download Completed",
+      {
+        chat_id: chatId,
+        message_id: loading.message_id
+      }
+    );
+
+  } catch (e) {
+
+    console.log(e);
+
+    bot.sendMessage(
+      chatId,
+      "❌ Download Failed\nLink မှန်မမှန် စစ်ပြီး ထပ်ပို့ပါ။"
+    );
+
   }
 
 });
