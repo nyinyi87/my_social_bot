@@ -1,16 +1,5 @@
 {
-  "name": "telegram-downloader-bot",
-  "version": "1.0.0",
-  "main": "index.js",
   "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "express": "^4.19.2",
-    "axios": "^1.7.2",
-    "yt-dlp-wrap": "^2.3.12",
-    "fs-extra": "^11.2.0",
-    "node-cron": "^3.0.3"
+    "start": "npm install -g yt-dlp && node index.js"
   }
 }
