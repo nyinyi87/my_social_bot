@@ -1,15 +1,27 @@
 {
-  "name": "my_social_bot",
+  "name": "telegram-downloader-bot",
   "version": "1.0.0",
+  "description": "Telegram YouTube Facebook Instagram Downloader Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [
+    "telegram",
+    "bot",
+    "youtube",
+    "facebook",
+    "instagram",
+    "downloader",
+    "yt-dlp"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "ffmpeg-static": "^5.2.0",
     "node-telegram-bot-api": "^0.66.0",
-    "yt-dlp-wrap": "^2.3.12",
-    "fs-extra": "^11.2.0",
-    "node-cron": "^3.0.3"
+    "yt-dlp-exec": "^3.0.8"
   }
 }
