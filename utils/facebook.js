@@ -1,168 +1,25 @@
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 
-const ytdlp =
-    require("yt-dlp-exec");
+const downloadDir = path.join(__dirname, "../downloads");
 
-const ffmpegPath =
-    require("ffmpeg-static");
+async function downloadFacebook(url) {
+  const outputPath = path.join(downloadDir, `fb_${Date.now()}.mp4`);
 
+  const apiRes = await axios.get(`https://api.vytal.dev/fb?url=${encodeURIComponent(url)}`);
+  const mediaUrl = apiRes.data.hd || apiRes.data.sd;
 
-// =====================================================
-// DOWNLOAD DIRECTORY
-// =====================================================
+  if (!mediaUrl) throw new Error("Facebook Video URL မရှာတွေ့ပါ။");
 
-const DOWNLOAD_DIR =
-    path.join(
-        __dirname,
-        "..",
-        "downloads"
-    );
+  const response = await axios({ method: "GET", url: mediaUrl, responseType: "stream" });
+  const writer = fs.createWriteStream(outputPath);
+  response.data.pipe(writer);
 
-
-if (
-    !fs.existsSync(DOWNLOAD_DIR)
-) {
-
-    fs.mkdirSync(
-        DOWNLOAD_DIR,
-        {
-            recursive: true
-        }
-    );
-
+  return new Promise((resolve, reject) => {
+    writer.on("finish", () => resolve(outputPath));
+    writer.on("error", reject);
+  });
 }
 
-
-// =====================================================
-// FIND FILE
-// =====================================================
-
-function findFile(
-    baseName
-) {
-
-    const files =
-        fs.readdirSync(
-            DOWNLOAD_DIR
-        );
-
-    const found =
-        files.find(
-            (file) =>
-                file.startsWith(
-                    baseName
-                )
-        );
-
-    if (!found) {
-        return null;
-    }
-
-    return path.join(
-        DOWNLOAD_DIR,
-        found
-    );
-
-}
-
-
-// =====================================================
-// FACEBOOK DOWNLOAD
-// =====================================================
-
-async function downloadFacebook(
-    url
-) {
-
-    const baseName =
-        "facebook_" +
-        Date.now() +
-        "_" +
-        crypto
-            .randomBytes(8)
-            .toString("hex");
-
-
-    const output =
-        path.join(
-            DOWNLOAD_DIR,
-            `${baseName}.%(ext)s`
-        );
-
-
-    console.log(
-        "Facebook download started"
-    );
-
-
-    const args = {
-
-        format:
-            "bestvideo+bestaudio/best",
-
-        output: output,
-
-        noPlaylist: true,
-
-        restrictFilenames: true,
-
-        ffmpegLocation:
-            ffmpegPath,
-
-        mergeOutputFormat:
-            "mp4",
-
-        noWarnings: true,
-
-        retries: 3,
-
-        fragmentRetries: 3,
-
-        concurrentFragments: 4
-
-    };
-
-
-    await ytdlp(
-        url,
-        args
-    );
-
-
-    const file =
-        findFile(
-            baseName
-        );
-
-
-    if (!file) {
-
-        throw new Error(
-            "Facebook video file not found"
-        );
-
-    }
-
-
-    console.log(
-        "Facebook saved:",
-        file
-    );
-
-
-    return file;
-
-}
-
-
-// =====================================================
-// EXPORT
-// =====================================================
-
-module.exports = {
-
-    downloadFacebook
-
-};
+module.exports = { downloadFacebook };
