@@ -1,164 +1,28 @@
 const fs = require("fs");
 const path = require("path");
 
+const downloadDir = path.join(__dirname, "../downloads");
 
-// =====================================================
-// DOWNLOAD DIRECTORY
-// =====================================================
+// နာရီဝက် (30 Mins) တိုင်း ၁ နာရီထက်ကြာသော ဖိုင်များကို ဖျက်မည်
+setInterval(() => {
+  if (!fs.existsSync(downloadDir)) return;
 
-const DOWNLOAD_DIR =
-    path.join(
-        __dirname,
-        "..",
-        "downloads"
-    );
+  fs.readdir(downloadDir, (err, files) => {
+    if (err) return;
 
+    const now = Date.now();
+    const oneHour = 60 * 60 * 1000;
 
-if (
-    !fs.existsSync(DOWNLOAD_DIR)
-) {
-
-    fs.mkdirSync(
-        DOWNLOAD_DIR,
-        {
-            recursive: true
+    files.forEach((file) => {
+      if (file === ".gitkeep") return; // .gitkeep ဖိုင်ကို မဖျက်ရန်
+      
+      const filePath = path.join(downloadDir, file);
+      fs.stat(filePath, (err, stats) => {
+        if (err) return;
+        if (now - stats.mtimeMs > oneHour) {
+          fs.unlink(filePath, () => {});
         }
-    );
-
-}
-
-
-// =====================================================
-// CLEANUP TIME
-// =====================================================
-
-// 30 minutes
-const MAX_AGE =
-    30 * 60 * 1000;
-
-
-// =====================================================
-// CLEAN FUNCTION
-// =====================================================
-
-function cleanupDownloads() {
-
-    console.log(
-        "🧹 Checking old downloads..."
-    );
-
-
-    let files;
-
-    try {
-
-        files =
-            fs.readdirSync(
-                DOWNLOAD_DIR
-            );
-
-    } catch (error) {
-
-        console.error(
-            "Cannot read downloads folder:",
-            error.message
-        );
-
-        return;
-    }
-
-
-    const now =
-        Date.now();
-
-
-    for (
-        const file of files
-    ) {
-
-        const filePath =
-            path.join(
-                DOWNLOAD_DIR,
-                file
-            );
-
-
-        try {
-
-            const stat =
-                fs.statSync(
-                    filePath
-                );
-
-
-            if (
-                !stat.isFile()
-            ) {
-                continue;
-            }
-
-
-            const age =
-                now -
-                stat.mtimeMs;
-
-
-            if (
-                age >
-                MAX_AGE
-            ) {
-
-                fs.unlinkSync(
-                    filePath
-                );
-
-
-                console.log(
-                    "Deleted old file:",
-                    file
-                );
-
-            }
-
-        } catch (error) {
-
-            console.error(
-                "Cleanup error:",
-                file,
-                error.message
-            );
-
-        }
-
-    }
-
-}
-
-
-// =====================================================
-// RUN EVERY 10 MINUTES
-// =====================================================
-
-cleanupDownloads();
-
-
-setInterval(
-    cleanupDownloads,
-    10 * 60 * 1000
-);
-
-
-console.log(
-    "🧹 Auto cleanup started"
-);
-
-
-// =====================================================
-// EXPORT
-// =====================================================
-
-module.exports = {
-
-    cleanupDownloads
-
-};
+      });
+    });
+  });
+}, 30 * 60 * 1000);
