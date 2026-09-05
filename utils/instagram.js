@@ -1,168 +1,25 @@
+const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 
-const ytdlp =
-    require("yt-dlp-exec");
+const downloadDir = path.join(__dirname, "../downloads");
 
-const ffmpegPath =
-    require("ffmpeg-static");
+async function downloadInstagram(url) {
+  const outputPath = path.join(downloadDir, `ig_${Date.now()}.mp4`);
 
+  const apiRes = await axios.get(`https://api.vytal.dev/instagram?url=${encodeURIComponent(url)}`);
+  const mediaUrl = apiRes.data.url || (apiRes.data.data && apiRes.data.data[0].url);
 
-// =====================================================
-// DOWNLOAD DIRECTORY
-// =====================================================
+  if (!mediaUrl) throw new Error("Instagram Media URL မရှာတွေ့ပါ။");
 
-const DOWNLOAD_DIR =
-    path.join(
-        __dirname,
-        "..",
-        "downloads"
-    );
+  const response = await axios({ method: "GET", url: mediaUrl, responseType: "stream" });
+  const writer = fs.createWriteStream(outputPath);
+  response.data.pipe(writer);
 
-
-if (
-    !fs.existsSync(DOWNLOAD_DIR)
-) {
-
-    fs.mkdirSync(
-        DOWNLOAD_DIR,
-        {
-            recursive: true
-        }
-    );
-
+  return new Promise((resolve, reject) => {
+    writer.on("finish", () => resolve(outputPath));
+    writer.on("error", reject);
+  });
 }
 
-
-// =====================================================
-// FIND FILE
-// =====================================================
-
-function findFile(
-    baseName
-) {
-
-    const files =
-        fs.readdirSync(
-            DOWNLOAD_DIR
-        );
-
-    const found =
-        files.find(
-            (file) =>
-                file.startsWith(
-                    baseName
-                )
-        );
-
-    if (!found) {
-        return null;
-    }
-
-    return path.join(
-        DOWNLOAD_DIR,
-        found
-    );
-
-}
-
-
-// =====================================================
-// INSTAGRAM DOWNLOAD
-// =====================================================
-
-async function downloadInstagram(
-    url
-) {
-
-    const baseName =
-        "instagram_" +
-        Date.now() +
-        "_" +
-        crypto
-            .randomBytes(8)
-            .toString("hex");
-
-
-    const output =
-        path.join(
-            DOWNLOAD_DIR,
-            `${baseName}.%(ext)s`
-        );
-
-
-    console.log(
-        "Instagram download started"
-    );
-
-
-    const args = {
-
-        format:
-            "bestvideo+bestaudio/best",
-
-        output: output,
-
-        noPlaylist: true,
-
-        restrictFilenames: true,
-
-        ffmpegLocation:
-            ffmpegPath,
-
-        mergeOutputFormat:
-            "mp4",
-
-        noWarnings: true,
-
-        retries: 3,
-
-        fragmentRetries: 3,
-
-        concurrentFragments: 4
-
-    };
-
-
-    await ytdlp(
-        url,
-        args
-    );
-
-
-    const file =
-        findFile(
-            baseName
-        );
-
-
-    if (!file) {
-
-        throw new Error(
-            "Instagram video file not found"
-        );
-
-    }
-
-
-    console.log(
-        "Instagram saved:",
-        file
-    );
-
-
-    return file;
-
-}
-
-
-// =====================================================
-// EXPORT
-// =====================================================
-
-module.exports = {
-
-    downloadInstagram
-
-};
+module.exports = { downloadInstagram };
