@@ -1,25 +1,21 @@
-const axios = require("axios");
-const fs = require("fs");
+const youtubedlp = require("yt-dlp-exec");
 const path = require("path");
+const fs = require("fs-extra");
 
-const downloadDir = path.join(__dirname, "../downloads");
+const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
+fs.ensureDirSync(DOWNLOAD_DIR);
 
 async function downloadFacebook(url) {
-  const outputPath = path.join(downloadDir, `fb_${Date.now()}.mp4`);
+  const fileName = `fb_${Date.now()}.mp4`;
+  const output = path.join(DOWNLOAD_DIR, fileName);
 
-  const apiRes = await axios.get(`https://api.vytal.dev/fb?url=${encodeURIComponent(url)}`);
-  const mediaUrl = apiRes.data.hd || apiRes.data.sd;
-
-  if (!mediaUrl) throw new Error("Facebook Video URL မရှာတွေ့ပါ။");
-
-  const response = await axios({ method: "GET", url: mediaUrl, responseType: "stream" });
-  const writer = fs.createWriteStream(outputPath);
-  response.data.pipe(writer);
-
-  return new Promise((resolve, reject) => {
-    writer.on("finish", () => resolve(outputPath));
-    writer.on("error", reject);
+  await youtubedlp(url, {
+    format: "best",
+    output
   });
+
+  const size = fs.statSync(output).size;
+  return { file: output, size, fileName };
 }
 
 module.exports = { downloadFacebook };
