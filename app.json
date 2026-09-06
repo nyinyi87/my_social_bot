@@ -1,0 +1,13 @@
+{
+  "name": "Telegram Downloader Bot",
+  "description": "YouTube Facebook Instagram Downloader Bot",
+  "repository": "https://github.com/yourusername/telegram-downloader-bot",
+  "env": {
+    "BOT_TOKEN": {
+      "description": "Telegram Bot Token"
+    },
+    "BASE_URL": {
+      "description": "Back4App App URL"
+    }
+  }
+}
