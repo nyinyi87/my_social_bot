@@ -1,34 +1,38 @@
-const ytdlp = require("yt-dlp-exec");
+const youtubedlp = require("yt-dlp-exec");
 const path = require("path");
-const fs = require("fs");
+const fs = require("fs-extra");
 
-const downloadDir = path.join(__dirname, "../downloads");
-if (!fs.existsSync(downloadDir)) {
-  fs.mkdirSync(downloadDir, { recursive: true });
-}
+const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
+fs.ensureDirSync(DOWNLOAD_DIR);
 
-async function downloadVideo(url, quality) {
-  const outputPath = path.join(downloadDir, `yt_${Date.now()}.mp4`);
+// Video Download
+async function downloadVideo(url, quality = "720") {
+  const fileName = `yt_${Date.now()}.mp4`;
+  const output = path.join(DOWNLOAD_DIR, fileName);
 
-  await ytdlp(url, {
-    format: `bestvideo[height<=${quality}]+bestaudio/best[height<=${quality}]/best`,
-    output: outputPath,
+  await youtubedlp(url, {
+    format: `bestvideo[height<=${quality}]+bestaudio/best[height<=${quality}]`,
+    output,
     mergeOutputFormat: "mp4"
   });
 
-  return outputPath;
+  const size = fs.statSync(output).size;
+  return { file: output, size, fileName };
 }
 
+// MP3 Download
 async function downloadMP3(url) {
-  const outputPath = path.join(downloadDir, `yt_${Date.now()}.mp3`);
+  const fileName = `yt_${Date.now()}.mp3`;
+  const output = path.join(DOWNLOAD_DIR, fileName);
 
-  await ytdlp(url, {
+  await youtubedlp(url, {
     extractAudio: true,
     audioFormat: "mp3",
-    output: outputPath
+    output
   });
 
-  return outputPath;
+  const size = fs.statSync(output).size;
+  return { file: output, size, fileName };
 }
 
 module.exports = { downloadVideo, downloadMP3 };
