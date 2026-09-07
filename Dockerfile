@@ -2,8 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# ffmpeg + python + yt-dlp install
-RUN apk add --no-cache python3 py3-pip ffmpeg \
+# Install ffmpeg + yt-dlp
+RUN apk add --no-cache ffmpeg python3 py3-pip \
     && pip3 install --break-system-packages yt-dlp
 
 COPY package*.json ./
@@ -14,4 +14,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["npm","start"]
