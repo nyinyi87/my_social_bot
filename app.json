@@ -1,13 +1,11 @@
 {
   "name": "Social Downloader Bot",
   "description": "Telegram Downloader Bot for Back4App",
-  "repository": "https://github.com/yourusername/social-downloader-bot",
   "keywords": [
     "telegram",
     "youtube",
     "facebook",
-    "instagram",
-    "bot"
+    "instagram"
   ],
   "env": {
     "BOT_TOKEN": {
@@ -17,7 +15,6 @@
       "description": "Back4App URL"
     },
     "PORT": {
-      "description": "Server Port",
       "value": "3000"
     }
   }
