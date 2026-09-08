@@ -6,11 +6,29 @@ const DOWNLOAD_DIR = path.join(__dirname, "../downloads");
 fs.ensureDirSync(DOWNLOAD_DIR);
 
 // ===============================
-// Instagram Video / Reel Download
+// Get Video Information
 // ===============================
-async function downloadInstagram(url, quality = "720") {
+async function getVideoInfo(url) {
+  const info = await ytdlp(url, {
+    dumpSingleJson: true,
+    noWarnings: true,
+    preferFreeFormats: true
+  });
 
-  const fileName = `instagram_${quality}_${Date.now()}.mp4`;
+  return {
+    title: info.title,
+    thumbnail: info.thumbnail,
+    duration: info.duration,
+    uploader: info.uploader
+  };
+}
+
+// ===============================
+// Download Video (144p - 1080p)
+// ===============================
+async function downloadVideo(url, quality = "720") {
+
+  const fileName = `youtube_${quality}_${Date.now()}.mp4`;
   const output = path.join(DOWNLOAD_DIR, fileName);
 
   await ytdlp(url, {
@@ -20,19 +38,21 @@ async function downloadInstagram(url, quality = "720") {
     noWarnings: true
   });
 
+  const size = fs.statSync(output).size;
+
   return {
     file: output,
     fileName,
-    size: fs.statSync(output).size
+    size
   };
 }
 
 // ===============================
-// Instagram MP3 Download
+// Download MP3
 // ===============================
-async function downloadInstagramMP3(url) {
+async function downloadMP3(url) {
 
-  const fileName = `instagram_${Date.now()}.mp3`;
+  const fileName = `youtube_${Date.now()}.mp3`;
   const output = path.join(DOWNLOAD_DIR, fileName);
 
   await ytdlp(url, {
@@ -43,63 +63,19 @@ async function downloadInstagramMP3(url) {
     noWarnings: true
   });
 
+  const size = fs.statSync(output).size;
+
   return {
     file: output,
     fileName,
-    size: fs.statSync(output).size
-  };
-}
-
-// ===============================
-// Instagram Photo / Carousel
-// ===============================
-async function downloadInstagramPhoto(url) {
-
-  const info = await ytdlp(url, {
-    dumpSingleJson: true,
-    noWarnings: true
-  });
-
-  const photos = [];
-
-  // Carousel
-  if (info.entries) {
-    for (const item of info.entries) {
-      if (item.thumbnail) {
-        photos.push(item.thumbnail);
-      }
-    }
-  }
-
-  // Single Photo
-  if (info.thumbnail) {
-    photos.push(info.thumbnail);
-  }
-
-  return { photos };
-}
-
-// ===============================
-// Instagram Info
-// ===============================
-async function getInstagramInfo(url) {
-
-  const info = await ytdlp(url, {
-    dumpSingleJson: true
-  });
-
-  return {
-    title: info.title,
-    thumbnail: info.thumbnail,
-    uploader: info.uploader,
-    duration: info.duration
+    size
   };
 }
 
 // ===============================
 // Available Qualities
 // ===============================
-async function getInstagramQualities(url) {
+async function getQualities(url) {
 
   const info = await ytdlp(url, {
     dumpSingleJson: true
@@ -123,9 +99,8 @@ async function getInstagramQualities(url) {
 }
 
 module.exports = {
-  downloadInstagram,
-  downloadInstagramMP3,
-  downloadInstagramPhoto,
-  getInstagramInfo,
-  getInstagramQualities
+  getVideoInfo,
+  getQualities,
+  downloadVideo,
+  downloadMP3
 };
